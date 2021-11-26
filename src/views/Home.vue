@@ -111,7 +111,7 @@
             </span>
           </div>
         </div>
-        <div class="iconsList">
+        <!-- <div class="iconsList">
           <div class="icon" @click="isAside = true">
             <span class="material-icons iconSource">
               favorite_border
@@ -400,7 +400,38 @@
               Favorite border
             </span>
           </div>
+        </div> -->
+        
+        <div class="" v-if="icons.filter(icon => icon.name.includes(keywords) && (icon.types.some(type => iconTypes.includes(type) && iconTypes.length) || !iconTypes.length)).length >= 1">
+          <div :class="{icon: true, activeGlyphIcon: activeGlyphicon.name === icon.name }" v-for="icon in icons.filter(icon => icon.name.includes(keywords) && (icon.types.some(type => iconTypes.includes(type) && iconTypes.length) || !iconTypes.length))" :key="icon.name" @click="isAside = true; activeGlyphicon = icon">
+        <!-- <div class="iconsList" v-if="icons.filter(icon => icon.name.includes(keywords) && icon.types.some(type => iconTypes.includes(type))).length >= 1">
+          <div :class="{icon: true, activeGlyphIcon: activeGlyphicon.name === icon.name }" v-for="icon in icons.filter(icon => icon.name.includes(keywords) && icon.types.some(type => iconTypes.includes(type)))" :key="icon.name" @click="isAside = true; activeGlyphicon = icon"> -->
+            
+            <!-- <span class="material-icons iconSource">
+              favorite_border
+            </span> -->
+            <img class="iconSource" :src="`http://localhost:4000/api/glyphicons/get/?glyphiconname=${icon.name}`" :alt="icon.name" width="45px" height="45px" />
+            <span>
+              {{
+                icon.name
+              }}
+            </span>
+          </div>
         </div>
+        <div v-else class="notFoundGlyphs">
+          <span class="notFoundGlyphsHeader notFoundGlyphsItem">
+            {{
+              notFoundGlyphsHeaders[randomNotFoundGlyphsHeader]
+            }}
+          </span>
+          <span class="notFoundGlyphsItem">
+            No icons found for ‘asd’
+          </span>
+          <button class="btn btn-primary w-25 notFoundGlyphsItem">
+            Clear your filters and try again
+          </button>
+        </div>
+
       </div>
       <div class="footer">
         <img class="asideHeaderItemElement" src="../assets/logo.png" alt="Circle" width="25px" />
@@ -417,9 +448,11 @@
     <div v-if="isAside" class="aside">
       <div class="asideHeader">
         <div class="asideHeaderItem">
-          <img class="asideHeaderItemElement" src="../assets/logo.png" alt="Circle" width="25px" />
+          <img class="asideHeaderItemElement" :src="`http://localhost:4000/api/glyphicons/get/?glyphiconname=${activeGlyphicon.name}`" :alt="activeGlyphicon.name" width="25px" />
           <span class="asideHeaderItemElement">
-            Circle
+            {{
+              activeGlyphicon.name
+            }}
           </span>
         </div>
         <div class="asideHeaderItem">
@@ -489,18 +522,22 @@
           </span>
         </div>
         <div class="codeExample">
-          <span v-text="`<span class=\'\'material-icons\'\'>\ncheck_circle_outline\n</span>`">
+          <!-- <span ref="codeExampleOne" v-text="`<span class=\'\'material-icons\'\'>\n${activeGlyphicon.name}</span>`">
             
-          </span>
-          <span class="material-icons codeExampleCopyBtn">
+          </span> -->
+          <textarea class="inputAsText" ref="codeExampleOne" :value="`<span class=\'\'material-icons\'\'>${activeGlyphicon.name}</span>`">
+          </textarea>
+          <span @click="copyCodeExample($refs.codeExampleOne)" class="material-icons codeExampleCopyBtn">
             content_copy
           </span>
         </div>
         <div class="codeExample">
-          <span v-text="`content_copy`">
+          <!-- <span v-text="`${activeGlyphicon.name}`">
             
-          </span>
-          <span class="material-icons codeExampleCopyBtn">
+          </span> -->
+          <textarea class="inputAsText" ref="codeExampleTwo" :value="`${activeGlyphicon.name}`">
+          </textarea>
+          <span @click="copyCodeExample($refs.codeExampleTwo)" class="material-icons codeExampleCopyBtn">
             content_copy
           </span>
         </div>
@@ -559,10 +596,66 @@ export default {
       iconTypes: [
         'filled'
       ],
-      platform: 'web'
+      platform: 'web',
+      icons: [],
+      notFoundGlyphsHeaders: [
+        '(;-;)',
+        '\(o_o)/',
+        '(^-^*)',
+        '\(^Д^)/',
+        '(·_·)',
+        '(o^^)o',
+        '(>_<)',
+        '(˚Δ˚)b',
+        '(=\'X\'=)',
+        '(≥o≤)',
+        '(^_^)b'
+      ],
+      randomNotFoundGlyphsHeader: 0,
+      keywords: '',
+      activeGlyphicon: {
+        name: 'Circle'
+      }
     }
   },
+  mounted() {
+    fetch(`http://localhost:4000/api/glyphicons/all/`, {
+      mode: 'cors',
+      method: 'GET'
+    }).then(response => response.body).then(rb  => {
+        const reader = rb.getReader()
+        return new ReadableStream({
+        start(controller) {
+            function push() {
+            reader.read().then( ({done, value}) => {
+                if (done) {
+                    console.log('done', done);
+                    controller.close();
+                    return;
+                }
+                controller.enqueue(value);
+                console.log(done, value);
+                push();
+            })
+            }
+            push();
+        }
+        });
+    }).then(stream => {
+      return new Response(stream, { headers: { "Content-Type": "text/html" } }).text();
+    })
+    .then(result => {
+      if (JSON.parse(result).status === 'OK') {
+        this.icons = JSON.parse(result).glyphicons
+        this.randomNotFoundGlyphsHeader = Math.floor(Math.random() * this.notFoundGlyphsHeaders.length)
+      }
+    })
+  },
   methods: {
+    copyCodeExample(code) {
+      code.select()
+      document.execCommand('copy')
+    },
     addIconsType(type) {
       if (!this.iconTypes.includes(type)) {
         this.iconTypes.push(type)
@@ -697,13 +790,16 @@ export default {
   }
 
   .icon {
+    box-sizing: border-box;
+    float: left;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     height: 100%;
     justify-content: center;
-    margin: 0px 25px;
+    padding: 30px 15px;
+    width: 125px;
   }
 
   .iconsList {
@@ -711,11 +807,13 @@ export default {
     display: flex;
     height: 75px;
     margin: 65px 0px;
+    /* padding: 75px 35px;  */
   }
 
   .iconSource {
     font-size: 36px;
     margin: 10px 0px;
+    border-radius: 8px;
   }
 
   .sorter {
@@ -841,11 +939,39 @@ export default {
   }
 
   .codeExampleCopyBtn {
+    cursor: pointer;
     /* font-size: 8px; */
     float: right;
     width: 35px;
     height: 15px;
   }
 
+  .notFoundGlyphs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notFoundGlyphsHeader {
+    font-size: 172px;
+    color: rgb(200, 200, 200);
+  }
+
+  .notFoundGlyphsItem {
+    margin: 10px 0px;
+  }
+
+  .inputAsText {
+    background-color: transparent;
+    border: none;
+    width: 100%;
+  }
+
+  .activeGlyphIcon {
+    outline: 1px solid rgb(0, 100, 255);
+    border-radius: 8px;
+    background-color: rgb(200, 255, 255);
+  }
 
 </style>

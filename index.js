@@ -2,10 +2,11 @@ const fs = require('fs')
 const multer  = require('multer')
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, 'uploads')
+      cb(null, 'icons')
     },
     filename: function (req, file, cb) {
-      cb(null, file.originalname)
+        cb(null, `${req.query.glyphiconname}.png`)
+        //   cb(null, file.originalname)
     }
 })
 const upload = multer({ storage: storage })
@@ -20,7 +21,7 @@ const app = express()
 
 app.use('/', serveStatic(path.join(__dirname, '/dist')))
 
-const url = `mongodb+srv://glebClusterUser:glebClusterUserPassword@cluster0.fvfru.mongodb.net/odbcs?retryWrites=true&w=majority`;
+const url = `mongodb+srv://glebClusterUser:glebClusterUserPassword@cluster0.fvfru.mongodb.net/glyphs?retryWrites=true&w=majority`;
 
 const connectionParams = {
     useNewUrlParser: true,
@@ -37,18 +38,23 @@ mongoose.connect(url, connectionParams)
     })
 
 const GlyphIconSchema = new mongoose.Schema({
-    name: String
+    name: String,
+    types: mongoose.Schema.Types.Array
 }, { collection : 'myglyphicons' })
 
 const GlyphIconModel = mongoose.model('GlyphIconModel', GlyphIconSchema);
 
-app.get('/api/glyphicons/create', (req, res) => {
+app.post('/api/glyphicons/create', upload.single('myFile'), (req, res) => {
         
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader("Access-Control-Allow-Headers", "X-Requested-With, X-Access-Token, X-Socket-ID, Content-Type");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
     
+    if (!req.file) {
+        return res.json({ status: 'Error' })
+    }
+
     let query = GlyphIconModel.find({  })
     query.exec((err, allGlyphIcons) => {
         if (err) {
@@ -58,26 +64,56 @@ app.get('/api/glyphicons/create', (req, res) => {
         let glyphIconExists = false
 
         allGlyphIcons.forEach(glyphIcon => {
-            if(cacher.email.includes(req.query.glyphiconname)){
+            if(glyphIcon.name.includes(req.query.glyphiconname)){
                 glyphIconExists = true
             }
         })
-        if(glyphIconExists){
+        if (glyphIconExists) {
             return res.json({ status: 'Error' })
 
         } else {
-            let glyphIcon = new GlyphIconModel({ name: req.query.glyphiconname })
+            let glyphIcon = new GlyphIconModel({ name: req.query.glyphiconname, types: req.query.glyphicontypes.split(',') })
             glyphIcon.save(function (err) {
                 if(err){
                     return res.json({ "status": "Error" })
                 } else {
-                    return res.json({ "status": "OK" })
+                    // return res.json({ "status": "OK" })
+                    return res.redirect('http://localhost:8080/')
                 }
             })
         }
     })
 
 })
+
+app.get('/api/glyphicons/get', (req, res) => {
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With, X-Access-Token, X-Socket-ID, Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+    
+    return res.sendFile(`${__dirname}/icons/${req.query.glyphiconname}.png`)
+
+})
+
+app.get('/api/glyphicons/all', (req, res) => {
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With, X-Access-Token, X-Socket-ID, Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+    
+    let queryOfIcons = GlyphIconModel.find({  })
+    queryOfIcons.exec((err, allGlyphIcons) => {
+        if (err){
+            return res.json({ status: 'Erorr' })
+        }
+        return res.json({ status: 'OK', glyphicons: allGlyphIcons })
+    })
+
+})
+
 
 app.get('**', (req, res) => { 
 
